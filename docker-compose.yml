@@ -1,0 +1,18 @@
+version: "3"
+services: 
+    backend-for-bus-router-app:
+        container_name: backend-for-bus-router-app
+        image: backend-for-bus-router-app
+        restart: always
+        build: .
+        ports: 
+            - "8080:8080"
+    
+    mongo:
+        image: mongo
+        container_name: mongo
+        ports: 
+            - "27017:27017"
+        restart: always
+        environment: 
+            MONGODB_URI : "mongodb://mongo:27017/"    
