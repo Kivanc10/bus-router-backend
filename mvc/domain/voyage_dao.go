@@ -42,23 +42,59 @@ func insertVoyage(client *mongo.Client, voyage *Voyage) *utils.AppErrors {
 		}
 		return stationError
 	}
-	if _, result := isAlreadyExistVoyage(voyage.From, voyage.To, client); !result {
-		res, err := collection.InsertOne(context.Background(), toSave)
-		if err != nil {
-			stationError := &utils.AppErrors{
-				Message:    "unable to insert voyage",
-				StatusCode: http.StatusBadRequest,
-				Code:       "mongo insert error",
+	n := []int{1, 2}
+	for i, _ := range n {
+		result := false
+		if i == 0 {
+			_, result = isAlreadyExistVoyage(voyage.From, voyage.To, client)
+			if !result {
+				res, err := collection.InsertOne(context.Background(), toSave)
+				if err != nil {
+					stationError := &utils.AppErrors{
+						Message:    "unable to insert voyage",
+						StatusCode: http.StatusBadRequest,
+						Code:       "mongo insert error",
+					}
+					return stationError
+				}
+				id := res.InsertedID
+				fmt.Println("id --> ", id)
+			} else {
+				return &utils.AppErrors{
+					Message:    "the voyage is already exist",
+					StatusCode: http.StatusUnauthorized,
+					Code:       "already exist voyage is provided",
+				}
 			}
-			return stationError
-		}
-		id := res.InsertedID
-		fmt.Println("id --> ", id)
-	} else {
-		return &utils.AppErrors{
-			Message:    "the voyage is already exist",
-			StatusCode: http.StatusUnauthorized,
-			Code:       "already exist voyage is provided",
+			//fmt.Println(result)
+		} else {
+			_, result = isAlreadyExistVoyage(voyage.To, voyage.From, client)
+			if !result {
+				newVoyage := *voyage
+				newVoyage.From = voyage.To
+				newVoyage.To = voyage.From
+				toSave, err := bson.Marshal(newVoyage)
+				if err != nil {
+					stationError := &utils.AppErrors{
+						Message:    "unable to marshall the station struct",
+						StatusCode: http.StatusBadRequest,
+						Code:       "marshall error",
+					}
+					return stationError
+				}
+				res, err := collection.InsertOne(context.Background(), toSave)
+				if err != nil {
+					stationError := &utils.AppErrors{
+						Message:    "unable to insert voyage",
+						StatusCode: http.StatusBadRequest,
+						Code:       "mongo insert error",
+					}
+					return stationError
+				}
+				id := res.InsertedID
+				fmt.Println("id --> ", id)
+			}
+
 		}
 	}
 	return nil
@@ -111,6 +147,7 @@ func isAlreadyExistVoyage(from, to Station, client *mongo.Client) (Voyage, bool)
 func DeleteVoyage(from, to string, client *mongo.Client) (Voyage, *utils.AppErrors) {
 	collection := client.Database("User_passenger").Collection("voyages")
 	from_, err := GetStationByName(from, client)
+	fmt.Println("from --> ", from_)
 	if err != nil {
 		return Voyage{}, &utils.AppErrors{
 			Message:    "an error occured during delete the voyage",
@@ -119,6 +156,7 @@ func DeleteVoyage(from, to string, client *mongo.Client) (Voyage, *utils.AppErro
 		}
 	}
 	to_, err := GetStationByName(to, client)
+	fmt.Println("to --> ", to_)
 	if err != nil {
 		return Voyage{}, &utils.AppErrors{
 			Message:    "an error occured during delete the voyage",
@@ -127,6 +165,7 @@ func DeleteVoyage(from, to string, client *mongo.Client) (Voyage, *utils.AppErro
 		}
 	}
 	temp := bson.M{"from": bson.M{"$eq": from_}, "to": bson.M{"$eq": to_}}
+	fmt.Println("voyage to del ----> ", temp)
 	var voyage Voyage
 	new_err := collection.FindOneAndDelete(context.Background(), temp).Decode(&voyage)
 	if new_err != nil {
